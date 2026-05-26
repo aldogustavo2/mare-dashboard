@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maré Studio - Dashboard v2</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --mar: #0F2A33;
+            --mare: #3A6B6F;
+            --sol: #E8B547;
+            --areia: #F5EFE0;
+            --preto: #1A1A1A;
+            --branco: #FFFFFF;
+            --erro: #f44336;
+            --sucesso: #4caf50;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--areia); color: var(--preto); }
+
+        /* LOGIN */
+        .login-wrap { display:flex; justify-content:center; align-items:center; min-height:100vh; background: linear-gradient(135deg, var(--mar), var(--mare)); }
+        .login-box { background: var(--branco); padding: 48px 40px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 420px; }
+        .login-logo { display:flex; justify-content:center; margin-bottom:28px; }
+        .login-logo svg { width: 72px; height: 72px; }
+        .login-box h1 { font-size:26px; font-weight:700; color:var(--mar); text-align:center; margin-bottom:4px; }
+        .login-box .sub { font-size:12px; color:var(--mare); text-align:center; margin-bottom:28px; font-weight:500; }
+        .tabs { display:flex; gap:8px; background:var(--areia); padding:4px; border-radius:10px; margin-bottom:24px; }
+        .tab { flex:1; padding:10px; border:none; background:transparent; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; color:var(--mare); transition:all .3s; }
+        .tab.active { background:var(--sol); color:var(--mar); }
+        .fg { margin-bottom:16px; }
+        .fg label { display:block; font-size:11px; font-weight:700; margin-bottom:6px; color:var(--mar); text-transform:uppercase; letter-spacing:.5px; }
+        .fg input, .fg select, .fg textarea { width:100%; padding:11px 14px; border:1.5px solid var(--areia); border-radius:8px; font-size:13px; background:var(--areia); font-family:'Inter',sans-serif; transition:all .3s; }
+        .fg input:focus, .fg select:focus, .fg textarea:focus { outline:none; border-color:var(--sol); box-shadow:0 0 0 3px rgba(232,181,71,.1); }
+        .btn-pri { width:100%; padding:12px; background:var(--sol); color:var(--mar); border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; transition:all .3s; text-transform:uppercase; letter-spacing:.5px; }
+        .btn-pri:hover { background:#FFB85C; transform:translateY(-2px); box-shadow:0 8px 20px rgba(232,181,71,.3); }
+        .login-hint { margin-top:24px; padding-top:20px; border-top:1px solid var(--areia); text-align:center; font-size:11px; color:var(--mare); }
+
+        /* LAYOUT */
+        .header { background:var(--branco); border-bottom:2px solid var(--areia); padding:14px 28px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+        .hbrand { display:flex; align-items:center; gap:12px; }
+        .hbrand svg { width:38px; height:38px; }
+        .hinfo h1 { font-size:15px; font-weight:700; color:var(--mar); }
+        .hinfo p { font-size:11px; color:var(--mare); }
+        .hright { display:flex; align-items:center; gap:12px; }
+        .notif-btn { position:relative; cursor:pointer; background:none; border:none; font-size:20px; padding:4px; }
+        .notif-badge { position:absolute; top:-2px; right:-2px; background:var(--erro); color:#fff; border-radius:50%; width:16px; height:16px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+        .btn-logout { padding:9px 16px; background:var(--erro); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
+
+        .sidebar { position:fixed; left:0; top:63px; width:220px; height:calc(100vh - 63px); background:var(--mar); padding:20px; overflow-y:auto; z-index:10; }
+        .st { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--sol); letter-spacing:1px; margin-bottom:10px; margin-top:20px; }
+        .si { padding:10px 12px; border-radius:8px; cursor:pointer; margin-bottom:4px; font-size:12px; font-weight:500; color:rgba(255,255,255,.75); transition:all .3s; }
+        .si:hover { background:rgba(232,181,71,.12); color:var(--sol); }
+        .si.active { background:rgba(232,181,71,0.15); color:var(--sol); font-weight:700; border-left:3px solid var(--sol); }
+
+        .main { margin-left:220px; padding:28px; margin-top:63px; min-height:100vh; }
+        .pt { font-size:28px; font-weight:700; color:var(--mar); margin-bottom:4px; }
+        .ps { font-size:12px; color:var(--mare); margin-bottom:28px; }
+
+        /* SEARCH & FILTERS */
+        .toolbar { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+        .search-box { flex:1; min-width:200px; position:relative; }
+        .search-box input { width:100%; padding:10px 14px 10px 38px; border:1.5px solid #ddd; border-radius:8px; font-size:13px; background:var(--branco); }
+        .search-box::before { content:'🔍'; position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; }
+        .filter-sel { padding:10px 14px; border:1.5px solid #ddd; border-radius:8px; font-size:12px; background:var(--branco); cursor:pointer; font-family:'Inter',sans-serif; }
+        .filter-sel:focus { outline:none; border-color:var(--sol); }
+
+        /* METRICS */
+        .mgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+        .mc { background:var(--branco); padding:20px; border-radius:12px; border:1.5px solid var(--areia); transition:all .3s; }
+        .mc:hover { border-color:var(--sol); transform:translateY(-2px); box-shadow:0 8px 20px rgba(232,181,71,.1); }
+        .mc-label { font-size:10px; color:var(--mare); margin-bottom:8px; text-transform:uppercase; font-weight:700; }
+        .mc-val { font-size:26px; font-weight:700; color:var(--sol); }
+
+        /* CHARTS */
+        .cgrid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+        .cc { background:var(--branco); padding:24px; border-radius:12px; border:1.5px solid var(--areia); }
+        .cc.full { grid-column:1/-1; }
+        .cc-title { font-size:13px; font-weight:700; color:var(--mar); margin-bottom:16px; }
+        .ch { position:relative; height:260px; }
+        .pmeta { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:14px; }
+        .ps2 { background:var(--areia); padding:12px; border-radius:8px; text-align:center; border-left:4px solid var(--sol); }
+        .ps2-label { color:var(--mare); font-size:10px; font-weight:700; text-transform:uppercase; margin-bottom:4px; }
+        .ps2-val { font-weight:700; color:var(--mar); font-size:17px; }
+
+        /* GANTT */
+        .gantt-wrap { overflow-x:auto; }
+        .gantt-table { width:100%; border-collapse:collapse; font-size:11px; min-width:600px; }
+        .gantt-table th { background:var(--areia); padding:8px 12px; text-align:left; font-weight:700; color:var(--mar); border-bottom:2px solid var(--sol); }
+        .gantt-table td { padding:8px 12px; border-bottom:1px solid var(--areia); }
+        .gantt-bar-wrap { width:100%; background:#eee; border-radius:4px; height:18px; position:relative; }
+        .gantt-bar { height:18px; border-radius:4px; min-width:4px; }
+
+        /* PROJECTS */
+        .section-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+        .actions { display:flex; gap:10px; }
+        .btn-sec { padding:9px 16px; background:var(--branco); color:var(--mar); border:1.5px solid var(--areia); border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; transition:all .3s; }
+        .btn-sec:hover { border-color:var(--sol); color:var(--sol); }
+        .pc { background:var(--branco); border:1.5px solid var(--areia); border-radius:12px; padding:18px; margin-bottom:14px; transition:all .3s; }
+        .pc:hover { border-color:var(--sol); box-shadow:0 8px 20px rgba(232,181,71,.1); }
+        .pc.arquivado { opacity:.6; border-style:dashed; }
+        .phdr { display:flex; justify-content:space-between; align-items:start; margin-bottom:12px; }
+        .ptitle { font-weight:700; color:var(--mar); font-size:14px; }
+        .pmini { font-size:10px; color:var(--mare); margin-top:3px; }
+        .pbadges { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+        .badge { display:inline-block; padding:3px 9px; border-radius:8px; font-size:10px; font-weight:700; text-transform:uppercase; }
+        .tipo-ses { background:#E8F5FF; color:var(--mar); border-left:3px solid var(--mare); }
+        .tipo-siaa { background:#E6F4EF; color:var(--mar); border-left:3px solid var(--sol); }
+        .status-proposta { background:var(--areia); color:var(--mar); }
+        .status-contratado { background:#E6F4EF; color:var(--mare); }
+        .status-andamento { background:#FFFBF0; color:#B8730A; }
+        .status-concluido { background:#EDE8F5; color:var(--mar); }
+        .status-arquivado { background:#EFEFEF; color:#555; }
+        .pmeta2 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0; }
+        .pmi { background:var(--areia); padding:9px; border-radius:8px; border-left:3px solid var(--sol); }
+        .pmi-label { color:var(--mare); font-size:9px; font-weight:700; text-transform:uppercase; margin-bottom:3px; }
+        .pmi-val { font-weight:700; color:var(--mar); font-size:12px; }
+        .pactions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+        .btn-xs { padding:6px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; border:1.5px solid #ddd; background:var(--branco); transition:all .3s; }
+        .btn-xs:hover { border-color:var(--sol); color:var(--sol); }
+        .btn-xs.danger { background:#FFF0EE; color:#C62828; border-color:#FFCCCC; }
+        .btn-xs.danger:hover { background:#FFB8A8; }
+
+        /* COMMENTS */
+        .comments-wrap { margin-top:16px; border-top:1px solid var(--areia); padding-top:14px; }
+        .comment { background:var(--areia); border-radius:8px; padding:10px; margin-bottom:8px; font-size:12px; }
+        .comment-autor { font-weight:700; color:var(--mar); margin-bottom:2px; font-size:11px; }
+        .comment-text { color:var(--preto); }
+        .comment-data { color:var(--mare); font-size:10px; margin-top:4px; }
+        .comment-input { display:flex; gap:8px; margin-top:10px; }
+        .comment-input input { flex:1; padding:9px 12px; border:1.5px solid #ddd; border-radius:8px; font-size:12px; font-family:'Inter',sans-serif; }
+        .comment-input button { padding:9px 16px; background:var(--sol); color:var(--mar); border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+
+        /* FILES */
+        .files-wrap { margin-top:12px; border-top:1px solid var(--areia); padding-top:12px; }
+        .file-item { display:flex; align-items:center; gap:8px; background:var(--areia); border-radius:6px; padding:8px 12px; margin-bottom:6px; font-size:12px; }
+        .file-item a { color:var(--mar); font-weight:600; text-decoration:none; flex:1; }
+        .file-item a:hover { color:var(--sol); }
+        .file-size { color:var(--mare); font-size:10px; }
+
+        /* MODAL */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,42,51,.6); z-index:200; justify-content:center; align-items:center; backdrop-filter:blur(4px); }
+        .modal.open { display:flex; }
+        .modal-box { background:var(--branco); padding:32px; border-radius:16px; width:90%; max-width:560px; max-height:90vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,.3); }
+        .modal-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:14px; border-bottom:2px solid var(--areia); }
+        .modal-title { font-size:18px; font-weight:700; color:var(--mar); }
+        .btn-close { background:none; border:none; font-size:26px; cursor:pointer; color:var(--mare); }
+        .fgrid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .fgrid.full { grid-template-columns:1fr; }
+        .modal-btns { display:flex; gap:12px; margin-top:24px; padding-top:16px; border-top:1px solid var(--areia); }
+        .btn-can { flex:1; padding:11px; background:var(--areia); color:var(--mare); border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; text-transform:uppercase; }
+
+        /* NOTIFICAÇÕES */
+        .notif-panel { position:absolute; right:60px; top:63px; width:320px; background:var(--branco); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.15); border:1.5px solid var(--areia); z-index:150; display:none; }
+        .notif-panel.open { display:block; }
+        .notif-panel-hdr { padding:16px; border-bottom:1px solid var(--areia); display:flex; justify-content:space-between; align-items:center; }
+        .notif-panel-hdr h3 { font-size:13px; font-weight:700; color:var(--mar); }
+        .notif-item { padding:12px 16px; border-bottom:1px solid var(--areia); cursor:pointer; transition:background .2s; }
+        .notif-item:hover { background:var(--areia); }
+        .notif-item.unread { background:#FFFBF0; border-left:3px solid var(--sol); }
+        .notif-title { font-size:12px; font-weight:600; color:var(--mar); }
+        .notif-msg { font-size:11px; color:var(--mare); margin-top:2px; }
+        .notif-time { font-size:10px; color:#bbb; margin-top:4px; }
+
+        /* CONFIG */
+        .config-card { background:var(--branco); border:1.5px solid var(--areia); border-radius:12px; padding:24px; margin-bottom:16px; }
+        .config-card h3 { font-size:14px; font-weight:700; color:var(--mar); margin-bottom:16px; }
+        .config-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+        .config-row label { font-size:12px; font-weight:600; color:var(--mar); min-width:140px; }
+        .config-row input { flex:1; padding:9px 12px; border:1.5px solid #ddd; border-radius:8px; font-size:13px; }
+
+        /* MISC */
+        .empty { text-align:center; padding:48px; color:var(--mare); font-size:13px; }
+        .loading { text-align:center; padding:40px; color:var(--mare); font-size:13px; }
+        .client-msg { background:var(--areia); border:2px solid var(--sol); border-radius:10px; padding:16px; margin-bottom:24px; }
+        .client-msg h3 { color:var(--sol); font-size:13px; font-weight:700; margin-bottom:4px; }
+        .upload-area { border:2px dashed var(--sol); border-radius:10px; padding:24px; text-align:center; cursor:pointer; transition:all .3s; background:var(--areia); }
+        .upload-area:hover { background:#FFFBF0; }
+        .upload-area input { display:none; }
+        .tag-arq { background:#EDE8F5; color:var(--mar); padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; }
+
+        @media (max-width:1100px) {
+            .mgrid { grid-template-columns:repeat(2,1fr); }
+            .cgrid { grid-template-columns:1fr; }
+        }
+        @media (max-width:768px) {
+            .sidebar { display:none; }
+            .main { margin-left:0; }
+            .mgrid { grid-template-columns:1fr; }
+            .pmeta2 { grid-template-columns:1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-wrap">
+    <div class="login-box">
+        <div class="login-logo">
+            <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <defs><clipPath id="c0"><circle cx="60" cy="60" r="50"/></clipPath></defs>
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#0F2A33" stroke-width="2"/>
+                <path d="M15 78 Q27 68,39 78 Q51 88,65 78 Q79 68,91 78 Q103 88,105 78 L105 110 L15 110Z" fill="#3A6B6F" clip-path="url(#c0)"/>
+            </svg>
+        </div>
+        <h1>MARÉ STUDIO</h1>
+        <p class="sub">Design com raiz e movimento</p>
+        <div class="tabs">
+            <button class="tab active" onclick="swTab('admin')">Admin</button>
+            <button class="tab" onclick="swTab('cliente')">Cliente</button>
+        </div>
+        <div id="adminLogin">
+            <div class="fg"><label>Senha</label><input type="password" id="adminPass" placeholder="Digite a senha"></div>
+            <button class="btn-pri" onclick="loginAdmin()">Entrar</button>
+        </div>
+        <div id="clienteLogin" style="display:none">
+            <div class="fg"><label>Organização</label><input value="EXN - Consórcio" disabled style="background:#f0f0f0;color:#999;"></div>
+            <div class="fg"><label>Senha</label><input type="password" id="clientePass" placeholder="Digite a senha"></div>
+            <button class="btn-pri" onclick="loginCliente()">Entrar</button>
+        </div>
+        <div class="login-hint">
+            <p>Demo → Admin: <b>admin123</b> | EXN: <b>exn123</b></p>
+        </div>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+    <div class="header">
+        <div class="hbrand">
+            <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <defs><clipPath id="c1"><circle cx="60" cy="60" r="50"/></clipPath></defs>
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#0F2A33" stroke-width="2"/>
+                <path d="M15 78 Q27 68,39 78 Q51 88,65 78 Q79 68,91 78 Q103 88,105 78 L105 110 L15 110Z" fill="#3A6B6F" clip-path="url(#c1)"/>
+            </svg>
+            <div class="hinfo">
+                <h1 id="hTitle">Dashboard</h1>
+                <p id="hSub">MARÉ STUDIO</p>
+            </div>
+        </div>
+        <div class="hright">
+            <button class="notif-btn" onclick="toggleNotif()" title="Notificações">
+                🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span>
+            </button>
+            <button class="btn-logout" onclick="logout()">Sair</button>
+        </div>
+    </div>
+
+    <!-- PAINEL NOTIFICAÇÕES -->
+    <div class="notif-panel" id="notifPanel">
+        <div class="notif-panel-hdr">
+            <h3>Notificações</h3>
+            <button onclick="marcarTodasLidas()" style="font-size:11px;color:var(--sol);background:none;border:none;cursor:pointer;font-weight:600;">Marcar todas lidas</button>
+        </div>
+        <div id="notifList"><div class="loading">Carregando...</div></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="st">Menu</div>
+        <div class="si active" onclick="goto('dashboard')">📊 Dashboard</div>
+        <div class="si" onclick="goto('projetos')">📁 Projetos</div>
+        <div class="si" onclick="goto('timeline')">📅 Timeline</div>
+        <div class="si" onclick="goto('relatorios')">📈 Relatórios</div>
+        <div id="adminSidebar" style="display:none">
+            <div class="st">Admin</div>
+            <div class="si" onclick="goto('config')">⚙️ Configurações</div>
+        </div>
+        <div id="filtroSidebar" style="display:none">
+            <div class="st">Filtros</div>
+            <div class="si" onclick="setFiltro('todos')">Todos</div>
+            <div class="si" onclick="setFiltro('SES')">SES</div>
+            <div class="si" onclick="setFiltro('SIAA')">SIAA</div>
+        </div>
+    </div>
+
+    <div class="main">
+
+        <!-- DASHBOARD -->
+        <div id="dashboardSection">
+            <div class="pt">Dashboard</div>
+            <p class="ps" id="dashSub">Visão geral em tempo real</p>
+            <div id="clienteMsg" class="client-msg" style="display:none">
+                <h3>✨ Portal de Acompanhamento EXN</h3>
+                <p style="font-size:12px;color:var(--mare);">Dados sincronizados em tempo real</p>
+            </div>
+            <div id="metricsWrap">
+                <div class="mgrid">
+                    <div class="mc"><div class="mc-label">Propostas</div><div class="mc-val" id="mProp">-</div></div>
+                    <div class="mc"><div class="mc-label">Em Andamento</div><div class="mc-val" id="mAnd">-</div></div>
+                    <div class="mc"><div class="mc-label">Faturado</div><div class="mc-val" id="mFat">-</div></div>
+                    <div class="mc"><div class="mc-label">A Receber</div><div class="mc-val" id="mRec">-</div></div>
+                </div>
+                <div class="cgrid">
+                    <div class="cc">
+                        <div class="cc-title">📈 Progresso de Faturamento</div>
+                        <div class="ch"><canvas id="chartFat"></canvas></div>
+                        <div class="pmeta">
+                            <div class="ps2"><div class="ps2-label">Faturado</div><div class="ps2-val" id="pFat">-</div></div>
+                            <div class="ps2"><div class="ps2-label">Restante</div><div class="ps2-val" id="pRest">-</div></div>
+                            <div class="ps2"><div class="ps2-label">% Meta</div><div class="ps2-val" id="pPct">-</div></div>
+                        </div>
+                    </div>
+                    <div class="cc">
+                        <div class="cc-title">📊 Status dos Projetos</div>
+                        <div class="ch"><canvas id="chartStatus"></canvas></div>
+                    </div>
+                    <div class="cc full">
+                        <div class="cc-title">📅 Faturamento Mensal</div>
+                        <div class="ch"><canvas id="chartMensal"></canvas></div>
+                    </div>
+                    <div class="cc">
+                        <div class="cc-title">🔵 SES vs SIAA (Quantidade)</div>
+                        <div class="ch"><canvas id="chartTipo"></canvas></div>
+                    </div>
+                    <div class="cc">
+                        <div class="cc-title">💰 SES vs SIAA (Valor)</div>
+                        <div class="ch"><canvas id="chartTipoVal"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROJETOS -->
+        <div id="projetosSection" style="display:none">
+            <div class="section-hdr">
+                <div><div class="pt">Projetos</div><p class="ps">Banners SES e SIAA</p></div>
+                <div class="actions">
+                    <button class="btn-sec" onclick="exportExcel()">📥 Excel</button>
+                    <button class="btn-sec" onclick="exportPDF()">📄 PDF</button>
+                    <button class="btn-pri" id="btnAdd" onclick="abrirModal()" style="display:none;padding:9px 18px;width:auto;">+ Novo</button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="search-box"><input id="busca" placeholder="Buscar projeto..." oninput="renderProjetos()"></div>
+                <select class="filter-sel" id="fStatus" onchange="renderProjetos()">
+                    <option value="">Todos os status</option>
+                    <option>Proposta</option>
+                    <option>Contratado</option>
+                    <option>Em Andamento</option>
+                    <option>Concluído</option>
+                </select>
+                <select class="filter-sel" id="fPrior" onchange="renderProjetos()">
+                    <option value="">Todas prioridades</option>
+                    <option>Alta</option>
+                    <option>Média</option>
+                    <option>Baixa</option>
+                </select>
+                <select class="filter-sel" id="fArq" onchange="renderProjetos()">
+                    <option value="ativos">Ativos</option>
+                    <option value="arquivados">Arquivados</option>
+                    <option value="todos">Todos</option>
+                </select>
+            </div>
+            <div id="projetosContainer"><div class="loading">Carregando...</div></div>
+        </div>
+
+        <!-- TIMELINE -->
+        <div id="timelineSection" style="display:none">
+            <div class="pt">Timeline</div>
+            <p class="ps">Visualização de prazos</p>
+            <div class="cc" style="margin-top:0">
+                <div class="gantt-wrap">
+                    <table class="gantt-table" id="ganttTable">
+                        <thead><tr><th>Projeto</th><th>Tipo</th><th>Status</th><th>Prazo</th><th>Progresso</th></tr></thead>
+                        <tbody id="ganttBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RELATÓRIOS -->
+        <div id="relatoriosSection" style="display:none">
+            <div class="pt">Relatórios</div>
+            <p class="ps">Análises por tipo e período</p>
+            <div class="cgrid" style="margin-top:0">
+                <div class="cc full">
+                    <div class="cc-title">📊 Comparativo SES vs SIAA</div>
+                    <div id="relatorioTabela"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONFIG -->
+        <div id="configSection" style="display:none">
+            <div class="pt">Configurações</div>
+            <p class="ps">Metas e acessos</p>
+            <div class="config-card">
+                <h3>🎯 Meta de Faturamento</h3>
+                <div class="config-row">
+                    <label>Meta mensal (R$)</label>
+                    <input type="number" id="confMeta" placeholder="10000">
+                    <button class="btn-pri" onclick="salvarMeta()" style="width:auto;padding:9px 18px;">Salvar</button>
+                </div>
+            </div>
+            <div class="config-card">
+                <h3>🔐 Senhas de Acesso</h3>
+                <div class="config-row">
+                    <label>Senha Admin</label>
+                    <input type="text" id="confSenhaAdmin" placeholder="Nova senha admin">
+                    <button class="btn-sec" onclick="salvarSenha('admin','confSenhaAdmin')">Alterar</button>
+                </div>
+                <div class="config-row">
+                    <label>Senha EXN (Cliente)</label>
+                    <input type="text" id="confSenhaExn" placeholder="Nova senha EXN">
+                    <button class="btn-sec" onclick="salvarSenha('exn','confSenhaExn')">Alterar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL PROJETO -->
+<div id="modalProjeto" class="modal">
+    <div class="modal-box">
+        <div class="modal-hdr">
+            <span class="modal-title" id="modalTitle">Novo Projeto</span>
+            <button class="btn-close" onclick="fecharModal()">✕</button>
+        </div>
+        <form onsubmit="salvarProjeto(event)">
+            <input type="hidden" id="projId">
+            <div class="fgrid full"><div class="fg"><label>Nome *</label><input type="text" id="projNome" required></div></div>
+            <div class="fgrid">
+                <div class="fg"><label>Tipo *</label><select id="projTipo" required><option value="SES">SES</option><option value="SIAA">SIAA</option></select></div>
+                <div class="fg"><label>Status *</label><select id="projStatus" required><option>Proposta</option><option>Contratado</option><option>Em Andamento</option><option>Concluído</option></select></div>
+            </div>
+            <div class="fgrid">
+                <div class="fg"><label>Prioridade</label><select id="projPrior"><option>Alta</option><option>Média</option><option>Baixa</option></select></div>
+                <div class="fg"><label>Valor (R$) *</label><input type="number" id="projValor" step="0.01" required></div>
+            </div>
+            <div class="fgrid">
+                <div class="fg"><label>Prazo (descrição)</label><input type="text" id="projPrazo" placeholder="ex: 72h"></div>
+                <div class="fg"><label>Data limite</label><input type="date" id="projData"></div>
+            </div>
+            <div class="fgrid full"><div class="fg"><label>Observações</label><textarea id="projObs" style="min-height:70px;resize:vertical;"></textarea></div></div>
+            <div class="modal-btns">
+                <button type="button" class="btn-can" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-pri" style="flex:1;">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const SURL = 'https://umahifmjejhzzofjntbp.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtYWhpZm1qZWpoenpvZmpudGJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzQ5NTMsImV4cCI6MjA5NTMxMDk1M30.0161rlQBv5NnTdm08wgN6CdH_Ob8NPHG_zRhb8hFtDA';
+const sb = window.supabase.createClient(SURL, SKEY);
+
+let usuario = null, tipo = null, filtroTipo = 'todos';
+let projetos = [], notificacoes = [];
+let meta = 10000, senhas = { admin: 'admin123', exn: 'exn123' };
+let charts = {};
+
+// ========== LOGIN ==========
+window.swTab = t => {
+    document.getElementById('adminLogin').style.display = t==='admin'?'block':'none';
+    document.getElementById('clienteLogin').style.display = t==='cliente'?'block':'none';
+    document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+    event.target.classList.add('active');
+};
+
+window.loginAdmin = async () => {
+    const s = document.getElementById('adminPass').value;
+    if (s === senhas.admin) {
+        usuario='admin'; tipo='admin';
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('app').style.display='block';
+        document.getElementById('hTitle').textContent='Dashboard Admin';
+        document.getElementById('adminSidebar').style.display='block';
+        document.getElementById('filtroSidebar').style.display='block';
+        document.getElementById('btnAdd').style.display='inline-block';
+        await carregarTudo();
+    } else { alert('Senha incorreta!'); }
+};
+
+window.loginCliente = async () => {
+    const s = document.getElementById('clientePass').value;
+    if (s === senhas.exn) {
+        usuario='exn'; tipo='cliente';
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('app').style.display='block';
+        document.getElementById('hTitle').textContent='Portal EXN';
+        document.getElementById('clienteMsg').style.display='block';
+        document.getElementById('metricsWrap').style.display='none';
+        await carregarTudo();
+    } else { alert('Senha incorreta!'); }
+};
+
+window.logout = () => location.reload();
+
+// ========== CARREGAR DADOS ==========
+async function carregarTudo() {
+    await carregarConfigs();
+    await carregarProjetos();
+    await carregarNotificacoes();
+    renderDashboard();
+}
+
+async function carregarConfigs() {
+    try {
+        const {data} = await sb.from('configuracoes').select('*');
+        if (data) {
+            data.forEach(c => {
+                if (c.chave==='meta_faturamento') meta = parseFloat(c.valor);
+                if (c.chave==='senha_admin') senhas.admin = c.valor;
+                if (c.chave==='senha_exn') senhas.exn = c.valor;
+            });
+        }
+    } catch(e) { console.log('Config fallback'); }
+}
+
+async function carregarProjetos() {
+    try {
+        const {data,error} = await sb.from('projetos').select('*').order('data_criacao',{ascending:false});
+        if (error) { console.error('Erro Supabase:', error); return; }
+        projetos = data || [];
+        console.log('Projetos carregados:', projetos.length);
+    } catch(e) {
+        console.error('Erro ao carregar projetos:', e);
+    }
+}
+
+async function carregarNotificacoes() {
+    const {data} = await sb.from('notificacoes').select('*').eq('destinatario',usuario).order('data_criacao',{ascending:false}).limit(20);
+    notificacoes = data || [];
+    const naoLidas = notificacoes.filter(n=>!n.lida).length;
+    const badge = document.getElementById('notifBadge');
+    if (naoLidas > 0) { badge.style.display='flex'; badge.textContent=naoLidas; }
+    else { badge.style.display='none'; }
+}
+
+// ========== NAVEGAÇÃO ==========
+window.goto = sec => {
+    document.querySelectorAll('[id$="Section"]').forEach(el=>el.style.display='none');
+    document.getElementById(sec+'Section').style.display='block';
+    document.querySelectorAll('.si').forEach(el=>el.classList.remove('active'));
+    event.target.classList.add('active');
+    if (sec==='projetos') renderProjetos();
+    if (sec==='timeline') renderTimeline();
+    if (sec==='relatorios') renderRelatorios();
+    if (sec==='config') carregarConfigUI();
+};
+
+window.setFiltro = t => { filtroTipo=t; renderDashboard(); renderProjetos(); };
+
+// ========== DASHBOARD ==========
+function getPV() {
+    return filtroTipo==='todos' ? projetos.filter(p=>!p.arquivado) : projetos.filter(p=>p.tipo===filtroTipo && !p.arquivado);
+}
+
+function renderDashboard() {
+    const pv = getPV();
+    if (tipo==='admin') {
+        const p = pv.filter(x=>x.status==='Proposta').length;
+        const a = pv.filter(x=>x.status==='Em Andamento').length;
+        const f = pv.filter(x=>x.status==='Concluído').reduce((s,x)=>s+parseFloat(x.valor||0),0);
+        const r = pv.filter(x=>x.status!=='Concluído'&&x.status!=='Proposta').reduce((s,x)=>s+parseFloat(x.valor||0),0);
+        document.getElementById('mProp').textContent=p;
+        document.getElementById('mAnd').textContent=a;
+        document.getElementById('mFat').textContent=fmt(f);
+        document.getElementById('mRec').textContent=fmt(r);
+        document.getElementById('pFat').textContent=fmt(f);
+        document.getElementById('pRest').textContent=fmt(Math.max(0,meta-f));
+        document.getElementById('pPct').textContent=Math.round((f/meta)*100)+'%';
+        renderChart('chartFat','doughnut',['Faturado','Restante'],[f,Math.max(0,meta-f)],['#E8B547','#F5EFE0']);
+        renderChart('chartStatus','bar',['Proposta','Contratado','Em Andamento','Concluído'],
+            [pv.filter(x=>x.status==='Proposta').length,pv.filter(x=>x.status==='Contratado').length,
+             pv.filter(x=>x.status==='Em Andamento').length,pv.filter(x=>x.status==='Concluído').length],
+            ['var(--areia)','var(--mare)','var(--sol)','var(--mar)']);
+        renderChartMensal();
+        renderChartTipo(pv);
+    }
+}
+
+function renderChart(id, type, labels, data, colors) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx.getContext('2d'), {
+        type, data: { labels, datasets:[{data, backgroundColor:colors, borderWidth:0}] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+    });
+}
+
+function renderChartMensal() {
+    const meses = {};
+    projetos.filter(p=>p.status==='Concluído').forEach(p => {
+        const m = (p.mes_referencia || p.data_criacao?.substring(0,7) || 'N/A');
+        meses[m] = (meses[m]||0) + parseFloat(p.valor||0);
+    });
+    const labels = Object.keys(meses).sort();
+    const vals = labels.map(l=>meses[l]);
+    const ctx = document.getElementById('chartMensal');
+    if (!ctx) return;
+    if (charts['chartMensal']) charts['chartMensal'].destroy();
+    charts['chartMensal'] = new Chart(ctx.getContext('2d'), {
+        type:'bar',
+        data: { labels, datasets:[{label:'Faturado (R$)', data:vals, backgroundColor:'#E8B547', borderRadius:6}] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+    });
+}
+
+function renderChartTipo(pv) {
+    const ses = pv.filter(p=>p.tipo==='SES');
+    const siaa = pv.filter(p=>p.tipo==='SIAA');
+    renderChart('chartTipo','doughnut',['SES','SIAA'],[ses.length,siaa.length],['var(--mare)','var(--sol)']);
+    renderChart('chartTipoVal','doughnut',
+        ['SES','SIAA'],
+        [ses.reduce((s,p)=>s+parseFloat(p.valor||0),0), siaa.reduce((s,p)=>s+parseFloat(p.valor||0),0)],
+        ['var(--mare)','var(--sol)']
+    );
+}
+
+// ========== PROJETOS ==========
+window.renderProjetos = () => {
+    const busca = document.getElementById('busca')?.value?.toLowerCase()||'';
+    const fStatus = document.getElementById('fStatus')?.value||'';
+    const fPrior = document.getElementById('fPrior')?.value||'';
+    const fArq = document.getElementById('fArq')?.value||'ativos';
+    let pv = projetos;
+    if (filtroTipo!=='todos') pv = pv.filter(p=>p.tipo===filtroTipo);
+    if (fArq==='ativos') pv = pv.filter(p=>!p.arquivado);
+    else if (fArq==='arquivados') pv = pv.filter(p=>p.arquivado);
+    if (busca) pv = pv.filter(p=>p.nome.toLowerCase().includes(busca));
+    if (fStatus) pv = pv.filter(p=>p.status===fStatus);
+    if (fPrior) pv = pv.filter(p=>p.prioridade===fPrior);
+    const c = document.getElementById('projetosContainer');
+    if (!pv.length) { c.innerHTML='<div class="empty">📭 Nenhum projeto encontrado</div>'; return; }
+    c.innerHTML = pv.map(p => projetoCard(p)).join('');
+};
+
+function projetoCard(p) {
+    const tipoC = p.tipo==='SES'?'tipo-ses':'tipo-siaa';
+    const stC = 'status-'+(p.status||'').toLowerCase().replace(' ','').replace('í','i');
+    let meta = '';
+    if (tipo==='admin') {
+        const fat = p.status==='Concluído'?parseFloat(p.valor||0):0;
+        const rec = (p.status!=='Concluído'&&p.status!=='Proposta')?parseFloat(p.valor||0):0;
+        meta = `<div class="pmeta2">
+            <div class="pmi"><div class="pmi-label">Valor</div><div class="pmi-val">${fmt(p.valor)}</div></div>
+            <div class="pmi"><div class="pmi-label">Faturado</div><div class="pmi-val">${fmt(fat)}</div></div>
+            <div class="pmi"><div class="pmi-label">A Receber</div><div class="pmi-val">${fmt(rec)}</div></div>
+            <div class="pmi"><div class="pmi-label">Prioridade</div><div class="pmi-val">${p.prioridade||'-'}</div></div>
+        </div>`;
+    }
+    const arqBtn = tipo==='admin' ? `<button class="btn-xs" onclick="arquivar('${p.id}',${!p.arquivado})">${p.arquivado?'Desarquivar':'Arquivar'}</button>` : '';
+    const editBtn = tipo==='admin' ? `<button class="btn-xs" onclick="editarProjeto('${p.id}')">✏️ Editar</button>` : '';
+    const delBtn = tipo==='admin' ? `<button class="btn-xs danger" onclick="deletar('${p.id}')">Deletar</button>` : '';
+    const statusOpts = tipo==='admin' ? `<select class="filter-sel" style="padding:6px 10px;font-size:11px;" onchange="mudarStatus('${p.id}',this.value)">
+        ${['Proposta','Contratado','Em Andamento','Concluído'].map(s=>`<option ${s===p.status?'selected':''}>${s}</option>`).join('')}
+    </select>` : '';
+    return `<div class="pc${p.arquivado?' arquivado':''}">
+        <div class="phdr">
+            <div>
+                <div class="ptitle">${p.nome}</div>
+                <div class="pmini">${p.prazo?'⏱ '+p.prazo:''} ${p.data_prazo?'• 📅 '+fmtData(p.data_prazo):''}</div>
+                <div class="pbadges">
+                    <span class="badge ${tipoC}">${p.tipo}</span>
+                    <span class="badge ${stC}">${p.status}</span>
+                    ${p.arquivado?'<span class="badge status-arquivado">Arquivado</span>':''}
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                ${statusOpts}
+            </div>
+        </div>
+        ${meta}
+        <div class="pactions">${editBtn}${arqBtn}${delBtn}</div>
+        <div class="comments-wrap" id="comm-${p.id}">
+            <div style="font-size:11px;font-weight:700;color:var(--mare);margin-bottom:8px;">💬 COMENTÁRIOS</div>
+            <div id="commList-${p.id}"><button class="btn-xs" onclick="carregarComentarios('${p.id}')">Ver comentários</button></div>
+            <div class="comment-input">
+                <input type="text" id="commInput-${p.id}" placeholder="Escrever comentário...">
+                <button onclick="addComentario('${p.id}')">Enviar</button>
+            </div>
+        </div>
+        <div class="files-wrap">
+            <div style="font-size:11px;font-weight:700;color:var(--mare);margin-bottom:8px;">📎 ARQUIVOS</div>
+            <div id="fileList-${p.id}"><button class="btn-xs" onclick="carregarArquivos('${p.id}')">Ver arquivos</button></div>
+            <div class="upload-area" onclick="document.getElementById('file-${p.id}').click()">
+                <input type="file" id="file-${p.id}" onchange="uploadArquivo('${p.id}',this)">
+                <div style="font-size:12px;color:var(--mare);">📁 Clique para enviar arquivo</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ========== AÇÕES PROJETOS ==========
+window.mudarStatus = async (id, novoStatus) => {
+    await sb.from('projetos').update({status:novoStatus}).eq('id',id);
+    await criarNotificacao('exn','Status atualizado',`Projeto atualizado para: ${novoStatus}`,id);
+    await carregarProjetos();
+    renderDashboard();
+    renderProjetos();
+};
+
+window.arquivar = async (id, val) => {
+    await sb.from('projetos').update({arquivado:val}).eq('id',id);
+    await carregarProjetos();
+    renderProjetos();
+};
+
+window.deletar = async id => {
+    if (confirm('Deletar projeto?')) {
+        await sb.from('projetos').delete().eq('id',id);
+        await carregarProjetos();
+        renderDashboard();
+        renderProjetos();
+    }
+};
+
+window.editarProjeto = id => {
+    const p = projetos.find(x=>x.id===id);
+    if (!p) return;
+    document.getElementById('modalTitle').textContent='Editar Projeto';
+    document.getElementById('projId').value=p.id;
+    document.getElementById('projNome').value=p.nome;
+    document.getElementById('projTipo').value=p.tipo;
+    document.getElementById('projStatus').value=p.status;
+    document.getElementById('projPrior').value=p.prioridade||'Alta';
+    document.getElementById('projValor').value=p.valor;
+    document.getElementById('projPrazo').value=p.prazo||'';
+    document.getElementById('projData').value=p.data_prazo||'';
+    document.getElementById('projObs').value=p.observacoes||'';
+    document.getElementById('modalProjeto').classList.add('open');
+};
+
+window.abrirModal = () => {
+    document.getElementById('modalTitle').textContent='Novo Projeto';
+    document.getElementById('projId').value='';
+    document.getElementById('modalProjeto').querySelector('form').reset();
+    document.getElementById('modalProjeto').classList.add('open');
+};
+
+window.fecharModal = () => document.getElementById('modalProjeto').classList.remove('open');
+
+window.salvarProjeto = async e => {
+    e.preventDefault();
+    const id = document.getElementById('projId').value;
+    const dados = {
+        nome: document.getElementById('projNome').value,
+        tipo: document.getElementById('projTipo').value,
+        status: document.getElementById('projStatus').value,
+        prioridade: document.getElementById('projPrior').value,
+        valor: parseFloat(document.getElementById('projValor').value),
+        prazo: document.getElementById('projPrazo').value,
+        data_prazo: document.getElementById('projData').value||null,
+        observacoes: document.getElementById('projObs').value,
+        // mes_referencia removido (coluna não existe)
+    };
+    if (id) {
+        await sb.from('projetos').update(dados).eq('id',id);
+    } else {
+        await sb.from('projetos').insert([dados]);
+        await criarNotificacao('exn','Novo projeto','Um novo projeto foi adicionado',null);
+    }
+    fecharModal();
+    await carregarProjetos();
+    renderDashboard();
+    renderProjetos();
+};
+
+// ========== COMENTÁRIOS ==========
+window.carregarComentarios = async id => {
+    const {data} = await sb.from('comentarios').select('*').eq('projeto_id',id).order('data_criacao');
+    const el = document.getElementById('commList-'+id);
+    if (!data||!data.length) { el.innerHTML='<div style="font-size:11px;color:var(--mare);">Nenhum comentário</div>'; return; }
+    el.innerHTML = data.map(c=>`<div class="comment">
+        <div class="comment-autor">${c.autor==='admin'?'🔧 Admin':'👤 EXN'}</div>
+        <div class="comment-text">${c.texto}</div>
+        <div class="comment-data">${fmtDataHora(c.data_criacao)}</div>
+    </div>`).join('');
+};
+
+window.addComentario = async id => {
+    const inp = document.getElementById('commInput-'+id);
+    const txt = inp.value.trim();
+    if (!txt) return;
+    await sb.from('comentarios').insert([{projeto_id:id,autor:usuario,texto:txt}]);
+    const dest = usuario==='admin'?'exn':'admin';
+    await criarNotificacao(dest,'Novo comentário',txt,id);
+    inp.value='';
+    await carregarComentarios(id);
+};
+
+// ========== ARQUIVOS ==========
+window.carregarArquivos = async id => {
+    const {data} = await sb.from('arquivos').select('*').eq('projeto_id',id).order('data_criacao');
+    const el = document.getElementById('fileList-'+id);
+    if (!data||!data.length) { el.innerHTML='<div style="font-size:11px;color:var(--mare);">Nenhum arquivo</div>'; return; }
+    el.innerHTML = data.map(f=>`<div class="file-item">
+        <a href="${f.url}" target="_blank">📄 ${f.nome}</a>
+        <span class="file-size">${f.tamanho?Math.round(f.tamanho/1024)+'KB':''}</span>
+        <span class="tag-arq">${f.tipo||'arquivo'}</span>
+    </div>`).join('');
+};
+
+window.uploadArquivo = async (id, input) => {
+    const file = input.files[0];
+    if (!file) return;
+    const path = `${id}/${Date.now()}_${file.name}`;
+    const {data, error} = await sb.storage.from('arquivos-projetos').upload(path, file);
+    if (error) {
+        // Se storage não configurado, salva só metadados
+        await sb.from('arquivos').insert([{projeto_id:id,nome:file.name,url:'#',tamanho:file.size,tipo:file.type,enviado_por:usuario}]);
+    } else {
+        const {data:urlData} = sb.storage.from('arquivos-projetos').getPublicUrl(path);
+        await sb.from('arquivos').insert([{projeto_id:id,nome:file.name,url:urlData.publicUrl,tamanho:file.size,tipo:file.type,enviado_por:usuario}]);
+    }
+    await carregarArquivos(id);
+};
+
+// ========== NOTIFICAÇÕES ==========
+async function criarNotificacao(dest, titulo, msg, projId) {
+    await sb.from('notificacoes').insert([{destinatario:dest,titulo,mensagem:msg,projeto_id:projId}]);
+}
+
+window.toggleNotif = async () => {
+    const panel = document.getElementById('notifPanel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+        const {data} = await sb.from('notificacoes').select('*').eq('destinatario',usuario).order('data_criacao',{ascending:false}).limit(20);
+        notificacoes = data||[];
+        const el = document.getElementById('notifList');
+        if (!notificacoes.length) { el.innerHTML='<div class="empty">Sem notificações</div>'; return; }
+        el.innerHTML = notificacoes.map(n=>`<div class="notif-item ${n.lida?'':'unread'}" onclick="lerNotif('${n.id}')">
+            <div class="notif-title">${n.titulo}</div>
+            <div class="notif-msg">${n.mensagem||''}</div>
+            <div class="notif-time">${fmtDataHora(n.data_criacao)}</div>
+        </div>`).join('');
+    }
+};
+
+window.lerNotif = async id => {
+    await sb.from('notificacoes').update({lida:true}).eq('id',id);
+    await carregarNotificacoes();
+    await toggleNotif(); await toggleNotif();
+};
+
+window.marcarTodasLidas = async () => {
+    await sb.from('notificacoes').update({lida:true}).eq('destinatario',usuario);
+    await carregarNotificacoes();
+    document.getElementById('notifPanel').classList.remove('open');
+};
+
+// ========== TIMELINE ==========
+function renderTimeline() {
+    const hoje = new Date();
+    const ativos = projetos.filter(p=>!p.arquivado);
+    document.getElementById('ganttBody').innerHTML = ativos.map(p => {
+        const stC = 'status-'+(p.status||'').toLowerCase().replace(' ','').replace('í','i');
+        let bColor = '#E8B547', pct = 0;
+        if (p.status==='Concluído') { bColor='var(--mar)'; pct=100; }
+        else if (p.status==='Em Andamento') { bColor='var(--sol)'; pct=50; }
+        else if (p.status==='Contratado') { bColor='var(--mare)'; pct=20; }
+        else { bColor='var(--mare)'; pct=5; }
+        return `<tr>
+            <td><b>${p.nome}</b></td>
+            <td><span class="badge tipo-${p.tipo.toLowerCase()}">${p.tipo}</span></td>
+            <td><span class="badge ${stC}">${p.status}</span></td>
+            <td>${p.data_prazo?fmtData(p.data_prazo):(p.prazo||'-')}</td>
+            <td style="width:200px;">
+                <div class="gantt-bar-wrap">
+                    <div class="gantt-bar" style="width:${pct}%;background:${bColor};"></div>
+                </div>
+                <div style="font-size:10px;color:var(--mare);margin-top:2px;">${pct}%</div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ========== RELATÓRIOS ==========
+function renderRelatorios() {
+    const ses = projetos.filter(p=>p.tipo==='SES'&&!p.arquivado);
+    const siaa = projetos.filter(p=>p.tipo==='SIAA'&&!p.arquivado);
+    const stats = (arr) => ({
+        total: arr.length,
+        valor: arr.reduce((s,p)=>s+parseFloat(p.valor||0),0),
+        concluidos: arr.filter(p=>p.status==='Concluído').length,
+        faturado: arr.filter(p=>p.status==='Concluído').reduce((s,p)=>s+parseFloat(p.valor||0),0),
+    });
+    const ss = stats(ses), si = stats(siaa);
+    document.getElementById('relatorioTabela').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--areia);">
+            <th style="padding:12px;text-align:left;">Métrica</th>
+            <th style="padding:12px;text-align:center;color:var(--mare);">SES</th>
+            <th style="padding:12px;text-align:center;color:var(--sol);">SIAA</th>
+            <th style="padding:12px;text-align:center;">Total</th>
+        </tr></thead>
+        <tbody>
+            <tr style="border-bottom:1px solid var(--areia);">
+                <td style="padding:12px;font-weight:600;">Total de Projetos</td>
+                <td style="padding:12px;text-align:center;">${ss.total}</td>
+                <td style="padding:12px;text-align:center;">${si.total}</td>
+                <td style="padding:12px;text-align:center;font-weight:700;">${ss.total+si.total}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--areia);background:var(--areia);">
+                <td style="padding:12px;font-weight:600;">Valor Total</td>
+                <td style="padding:12px;text-align:center;">${fmt(ss.valor)}</td>
+                <td style="padding:12px;text-align:center;">${fmt(si.valor)}</td>
+                <td style="padding:12px;text-align:center;font-weight:700;">${fmt(ss.valor+si.valor)}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--areia);">
+                <td style="padding:12px;font-weight:600;">Concluídos</td>
+                <td style="padding:12px;text-align:center;">${ss.concluidos}</td>
+                <td style="padding:12px;text-align:center;">${si.concluidos}</td>
+                <td style="padding:12px;text-align:center;font-weight:700;">${ss.concluidos+si.concluidos}</td>
+            </tr>
+            <tr style="background:var(--areia);">
+                <td style="padding:12px;font-weight:600;">Faturado</td>
+                <td style="padding:12px;text-align:center;color:var(--mare);font-weight:700;">${fmt(ss.faturado)}</td>
+                <td style="padding:12px;text-align:center;color:var(--sol);font-weight:700;">${fmt(si.faturado)}</td>
+                <td style="padding:12px;text-align:center;font-weight:700;color:var(--sol);">${fmt(ss.faturado+si.faturado)}</td>
+            </tr>
+        </tbody>
+    </table>`;
+}
+
+// ========== EXPORT ==========
+window.exportExcel = () => {
+    const rows = projetos.map(p=>({
+        Nome: p.nome, Tipo: p.tipo, Status: p.status, Prioridade: p.prioridade,
+        Valor: p.valor, Prazo: p.prazo, 'Data Limite': p.data_prazo||'',
+        Observações: p.observacoes||'', Arquivado: p.arquivado?'Sim':'Não'
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Projetos');
+    XLSX.writeFile(wb, `mare_projetos_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+window.exportPDF = () => {
+    const win = window.open('','_blank');
+    const rows = projetos.filter(p=>!p.arquivado).map(p=>`<tr>
+        <td>${p.nome}</td><td>${p.tipo}</td><td>${p.status}</td>
+        <td>${fmt(p.valor)}</td><td>${p.prazo||'-'}</td>
+    </tr>`).join('');
+    win.document.write(`<html><head><title>Relatório Maré Studio</title>
+    <style>body{font-family:Inter,sans-serif;padding:20px}h1{color:#0F2A33}table{width:100%;border-collapse:collapse;margin-top:20px}
+    th{background:#0F2A33;color:#fff;padding:10px}td{padding:8px;border-bottom:1px solid #eee}
+    .footer{margin-top:40px;color:#999;font-size:11px;text-align:center}</style></head>
+    <body><h1>Maré Studio — Relatório de Projetos</h1>
+    <p style="color:#3A6B6F">Gerado em: ${new Date().toLocaleDateString('pt-BR')}</p>
+    <table><thead><tr><th>Projeto</th><th>Tipo</th><th>Status</th><th>Valor</th><th>Prazo</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="footer">Design com raiz e movimento — Maré Studio</div>
+    <script>window.print()<\/script></body></html>`);
+};
+
+// ========== CONFIG ==========
+function carregarConfigUI() {
+    document.getElementById('confMeta').value = meta;
+}
+
+window.salvarMeta = async () => {
+    const v = parseFloat(document.getElementById('confMeta').value);
+    if (!v) return;
+    meta = v;
+    await sb.from('configuracoes').upsert([{chave:'meta_faturamento',valor:String(v)}],{onConflict:'chave'});
+    alert('Meta salva!');
+    renderDashboard();
+};
+
+window.salvarSenha = async (org, inputId) => {
+    const ns = document.getElementById(inputId).value;
+    if (!ns) return;
+    const chave = org==='admin'?'senha_admin':'senha_exn';
+    await sb.from('configuracoes').upsert([{chave,valor:ns}],{onConflict:'chave'});
+    senhas[org] = ns;
+    alert('Senha alterada!');
+    document.getElementById(inputId).value='';
+};
+
+// ========== UTILS ==========
+function fmt(v) {
+    return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+}
+function fmtData(d) {
+    if (!d) return '-';
+    return new Date(d+'T00:00:00').toLocaleDateString('pt-BR');
+}
+function fmtDataHora(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleString('pt-BR');
+}
+
+// Fechar notif ao clicar fora
+document.addEventListener('click', e => {
+    const panel = document.getElementById('notifPanel');
+    if (panel && !panel.contains(e.target) && !e.target.classList.contains('notif-btn')) {
+        panel.classList.remove('open');
+    }
+});
+</script>
+</body>
+</html>
